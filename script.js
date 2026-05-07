@@ -56,8 +56,8 @@ class Cell {
         this.x = x;
         this.y = y;
         this.value = 0;
-
         this.td = this.generateCellDiv(); 
+        this.collide = false
         
     } 
     
@@ -84,6 +84,7 @@ class Cell {
 class player {
     constructor () {
         this.spawnPiece();
+
         document.addEventListener('keydown', function(key) {
             switch (key.keyCode) {
                 case 38: //Up Arrow
@@ -95,27 +96,28 @@ class player {
                         }
                         rotatedShape.push(newRow);
                     }
-                    if (checkCollision(currentShape, currentX, currentY) == false) {
+                    if (activePlayer.checkCollision(currentShape, activePlayer.x, activePlayer.y) == false) {
                         currentShape = rotatedShape;
+                        update()
                     }
                     break;
 
                 case 37: //Left Arrow
-                    if (checkCollision(currentShape, currentX, currentY) == false) {
+                    if (activePlayer.checkCollision(currentShape, activePlayer.x - 1, activePlayer.y) == false) {
                         activePlayer.x--;
                         update()
                     }
                     break;
                 
                 case 39: //Right Arrow
-                    if (checkCollision(currentShape, currentX, currentY) == false) {
+                    if (activePlayer.checkCollision(currentShape, activePlayer.x + 1, activePlayer.y) == false) {
                         activePlayer.x++;
                         update()
                     }
                     break;
                 
                 case 40: //Down Arrow
-                    if (checkCollision(currentShape, currentX, currentY) == false) {
+                    if (activePlayer.checkCollision(currentShape, activePlayer.x, activePlayer.y + 1) == false) {
                         activePlayer.y++;
                         update()
                     }
@@ -131,28 +133,130 @@ class player {
         currentShape = pieces[randomIndex];
         currentColor = colors[randomIndex];
         this.x = 3;
-        this.y = -1;
+        this.y = -2;
     }
 
     gravity(){
         this.y++
     }
 
-    checkCollision(cs, testX, testY) {
-        for (let r = 0; r < row; r++) {
-            for (let c = 0; c < column; c++) {
+    checkCollision(cs, checkX, checkY) {
+        for (let r = 0; r < checkY.length; r++) {
+            for (let c = 0; c < checkX.length; c++) {
                 if (cs[r][c] == 1) {
-                    if (testX < 0 || testX >= column || testY < 0) {
+                    let testX = checkX + c;
+                    let testY = checkY + r;
+
+                    // Check wall & floor
+                    if (testX < 0 || testX >= column || testY >= row) {
                         return true;
                     }
 
-
-                //Future note: need to check collision with placed blocks
+                    // Check if it hit a block
+                    if (testY >= 0 && tbl[testY][testX].collide == true) {
+                        return true;
+                    }
                 }
             }
         }
+        // No collision
+        return false;
+    }
+
+    lockPiece() {
+        for (let r = 0; r < currentShape.length; r++) {
+            for (let c = 0; c < currentShape[r].length; c++) {
+                if (currentShape[r][c] == 1) {
+                    let lockY = currentY + r;
+                    let lockX = currentX + c;
+                    
+                    if (lockY >= 0) {
+                        tbl[lockY][lockX].isLocked = true;
+                        tbl[lockY][lockX].table.style.backgroundColor = currentColor;
+                    }
+                }
+            }
+        }
+        
+        clearLines();
+        spawnPiece(); // Bring in the next block!
+    }
+
+    clearLines() {
+    // Check from bottom to top
+        for (let r = activePlayer.y - 1; r >= 0; r--) {
+            let isFull = true;
+            
+            for (let c = 0; c < activePlayer.x; c++) {
+                if (tbl[r][c].isLocked == false) {
+                    isFull = false;
+                    break;
+                }
+            }
+            // If the row is totally filled
+            if (isFull == true) {
+                
+                // Shift every row above this one DOWN by 1
+                for (let moveRow = r; moveRow > 0; moveRow--) {
+                    for (let c = 0; c < x; c++) {
+                        tbl[moveRow][c].isLocked = tbl[moveRow - 1][c].isLocked;
+                        tbl[moveRow][c].table.style.backgroundColor = tbl[moveRow - 1][c].table.style.backgroundColor;
+                    }
+                }
+                
+                // Empty the very top row
+                for (let c = 0; c < x; c++) {
+                    tbl[0][c].isLocked = false;
+                    tbl[0][c].table.style.backgroundColor = "transparent";
+                }
+                
+                r++; // Check this same row number again, since new blocks just fell into it
+            }
+        }
+    }
+
+
+    
+}
+
+
+
+
+function clearLines() {
+// Check from bottom to top
+    for (let r = activePlayer.y - 1; r >= 0; r--) {
+        let isFull = true;
+        
+        for (let c = 0; c < activePlayer.x; c++) {
+            if (tbl[r][c].isLocked == false) {
+                isFull = false;
+                break;
+            }
+        }
+        // If the row is totally filled
+        if (isFull == true) {
+            
+            // Shift every row above this one DOWN by 1
+            for (let moveRow = r; moveRow > 0; moveRow--) {
+                for (let c = 0; c < x; c++) {
+                    tbl[moveRow][c].isLocked = tbl[moveRow - 1][c].isLocked;
+                    tbl[moveRow][c].table.style.backgroundColor = tbl[moveRow - 1][c].table.style.backgroundColor;
+                }
+            }
+            
+            // Empty the very top row
+            for (let c = 0; c < x; c++) {
+                tbl[0][c].isLocked = false;
+                tbl[0][c].table.style.backgroundColor = "transparent";
+            }
+            
+            r++; // Check this same row number again, since new blocks just fell into it
+        }
     }
 }
+
+
+
 
 function update() {
     for (let r = 0; r < row; r++) {
@@ -181,11 +285,12 @@ function update() {
 
 
 
-createBoard()
+createBoard();
 let activePlayer = new player();
 
 setInterval(function() {
     activePlayer.gravity();
+
     update();
 }, 200);
 
